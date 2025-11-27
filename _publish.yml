@@ -1,0 +1,4 @@
+- source: reporte_ventas.qmd
+  quarto-pub:
+    - id: 05787d3b-f8d6-4570-a8a7-64f5cd11b0c9
+      url: https://marycde.quarto.pub/reporte-de-ventas-89d5

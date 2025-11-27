@@ -1,0 +1,581 @@
+---
+title: "REPORTE DE VENTAS"
+format: 
+    revealjs:
+        theme: simple
+        transition: fade
+author: "DA 61"
+jupyter: python3
+date: last-modified
+title-slide-attributes:
+    data-background-color: "#16425b"
+---
+
+```{python}
+# | echo: false
+
+# Carga de librerías
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+
+# Carga de datos
+df_pixel = pd.read_table('registro_pixel.txt', sep='\t')
+
+# Preparación de datos
+# Eliminar registros con valores perdidos en cliente_id
+df_pixel = df_pixel.dropna(subset = "cliente_id").reset_index(drop = True)
+
+# Cambiar tipo de columna cantidad
+df_pixel["valor_cantidad"] = df_pixel["valor_cantidad"].astype(int)
+
+# Eliminar filas en las que las cantidades sean 0
+df_pixel = df_pixel.query("valor_cantidad > 0")
+
+# Eliminar valores duplicados
+df_pixel = df_pixel.drop_duplicates(subset = ["comanda_id", "cliente_id", "tipo_articulo"]).reset_index(drop = True)
+
+# Parametrización de visualizaciones
+# Definir paleta de colores
+color_fondo = "#dff0ef" #Codigo hexadecimal
+color_linea = "#424B54"
+color_fill = [
+    "#081b27",
+    "#16425b",
+    "#3a7ca5",
+    "#81c3d7",
+    "#acddec",
+    "#f45b4a",
+    "#f79489",
+    "#f8AFA6",
+    "#fadcd9",
+    "#f9f1f0"
+]
+
+# Definir formato de etiquetas
+form_etiquetas = dict(
+    font = dict(size = 15)
+)
+
+# Definir formato de ejes
+form_ticks = dict(
+    tickfont = dict(size = 15)
+)
+
+# Definir formato de leyendas
+form_leyendas = dict(
+    orientation = "h", 
+    y = 1, 
+    yanchor = "bottom",
+    font = dict(size = 15)
+)
+
+```
+
+# ANÁLISIS DE VENTAS {background-color="#3a7ca5"}
+
+## Evolucion de ventas
+
+```{python}
+
+# Crear tabla con información requerida
+evol_vta = (
+    df_pixel
+    .groupby("periodo")
+    .agg(ventas = ("valor_venta","sum"))
+    .reset_index()
+)
+
+evol_vta["var"] = evol_vta["ventas"] / evol_vta["ventas"].shift(1) - 1
+
+def fun_info (x):
+    per = x["periodo"]
+    vta = x["ventas"]/1000
+    var = x["var"]
+    if np.isnan(var):
+        texto = f"<b>{per:.0f}</b><br>Ventas (KUSD): {vta:,.0f}"
+    else:
+        texto = f"<b>{per:.0f}</b><br>Ventas (KUSD): {vta:,.0f}<br>Var. YoY: {var:.1%}"
+    return texto
+evol_vta["info"] = evol_vta.apply(fun_info, axis = 1)
+
+# Generar visualización interactiva
+fig = go.Figure(
+    data = go.Bar(
+
+            x = evol_vta['periodo'],
+            y = evol_vta["ventas"],
+            
+            hovertext = evol_vta["info"],
+            hoverinfo = "text",
+            hoverlabel = form_etiquetas,
+            
+            opacity = 0.9,
+            width = 0.5,
+            marker = dict(color = color_fill[1])
+
+        )
+)
+
+fig.update_layout(
+    plot_bgcolor = color_fondo,
+    xaxis = form_ticks,
+    yaxis = form_ticks,
+    autosize = False,
+    width = 1000,
+    height = 500,
+    margin=dict(t = 40)
+)
+
+fig.show()
+
+```
+
+# ANÁLISIS DE DEMANDA {background-color="#3a7ca5"}
+
+## Comportamiento del ticket
+```{python}
+
+# Crear tabla con información requerida
+evol_tkt = (
+    df_pixel
+    .groupby("periodo")
+    .agg(
+        ventas = ("valor_venta","sum"),
+        ordenes = ("comanda_id","nunique"),
+    )
+    .reset_index()
+)
+
+evol_tkt["ticket"] = evol_tkt["ventas"]/evol_tkt["ordenes"]
+evol_tkt["var"] = evol_tkt["ticket"] / evol_tkt["ticket"].shift(1) - 1
+
+def fun_info (x):
+    per = x["periodo"]
+    tik = x["ticket"]
+    var = x["var"]
+    if np.isnan(var):
+        texto = f"<b>{per:.0f}</b><br>Ticket (USD): {tik:,.1f}"
+    else:
+        texto = f"<b>{per:.0f}</b><br>Ticket (USD): {tik:,.1f}<br>Var. YoY: {var:.1%}"
+    return texto
+evol_tkt["info"] = evol_tkt.apply(fun_info, axis = 1)
+
+# Generar visualización interactiva
+fig = go.Figure(
+    data = go.Scatter(
+
+        x = evol_tkt['periodo'],
+        y = evol_tkt["ticket"],
+        
+        mode = "lines+markers",
+        
+        hovertext = evol_tkt["info"],
+        hoverinfo = "text",
+        hoverlabel = form_etiquetas,
+        
+        marker = dict(
+            color = color_fill[5],  
+            size = 10
+        ),
+        
+        line = dict(
+            color = color_linea, 
+            width = 3, 
+            shape = "spline", 
+            smoothing = 1, 
+            dash = "dot"
+        )
+    )
+)
+
+fig.update_layout(
+    plot_bgcolor = color_fondo,
+    xaxis = form_ticks,
+    yaxis = form_ticks,
+    autosize = False,
+    width = 1000,
+    height = 600
+)
+
+fig.show()
+
+```
+
+## Comportamiento de comandas
+```{python}
+# Crear tabla con informacion requerida
+com_diaper = (
+    df_pixel
+    .query("periodo != 2020 and periodo != 2021")
+    .pivot_table(
+        index = "dia_semana",
+        columns = "periodo",
+        values = "comanda_id",
+        aggfunc = "nunique"
+    )
+)
+com_diaper.index = ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"]
+
+# Generar gráfico interactivo
+i = len(com_diaper.columns) - 1
+
+fig = go.Figure()
+
+for col in com_diaper.columns:
+    
+    etiqueta = [f"{col}: {x:,.0f}" for x in com_diaper[col]] 
+
+    fig.add_trace(
+        
+        go.Bar(
+            
+            name = col,
+            x = com_diaper.index,
+            y = com_diaper[col],
+            
+            hovertext = etiqueta,
+            hoverinfo = "text",
+            hoverlabel = form_etiquetas,
+            
+            opacity = 0.9,
+            marker = dict(color = color_fill[i])
+            
+        )
+    )
+
+    i -= 1
+
+fig.update_layout(
+    plot_bgcolor = color_fondo,
+    xaxis = form_ticks,
+    yaxis = form_ticks,
+    legend = form_leyendas,
+    autosize = False,
+    width = 1000,
+    height = 600,
+    margin = dict(t = 100)
+)
+
+fig.show()
+
+```
+
+## Comportamiento por tipo de consumo
+
+```{python}
+# Crear tabla con informacion requerida
+art_dia = (
+    df_pixel
+    .query("periodo != 2020 and periodo != 2021")
+    .pivot_table(
+        index = "dia_semana",
+        columns = "tipo_articulo",
+        values = "valor_cantidad",
+        aggfunc = "sum"
+    )
+)
+art_dia.index = ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"]
+
+art_dia = art_dia.apply(lambda x: 100*x/x.sum(), axis = 1)
+
+# Generar visualizacion interactiva
+i = 0
+
+fig = go.Figure()
+
+for col in art_dia.columns:
+    
+    etiqueta = [f"{col}: {x:.1f}%" for x in art_dia[col]] 
+
+    fig.add_trace(
+
+        go.Bar(
+            
+            name = col,
+            x = art_dia.index,
+            y = art_dia[col],
+            
+            hovertext = etiqueta,
+            hoverinfo = "text",
+            hoverlabel = form_etiquetas,
+            
+            opacity = 0.9,
+            width = 0.8,
+            marker = dict(
+                color = color_fill[i],
+                line = dict(color = color_linea))
+        )
+    )
+    i += 1
+
+form_ticks_y = form_ticks.copy()
+form_ticks_y["range"] = [0,100]
+form_leyendas_c = form_leyendas.copy()
+form_leyendas_c["font"] = dict(size = 10)
+fig.update_layout(
+    barmode = "stack",
+    plot_bgcolor = color_fondo,
+    xaxis = form_ticks,
+    yaxis = form_ticks_y,
+    legend = form_leyendas_c,
+    autosize = False,
+    width = 1000,
+    height = 600,
+    margin = dict(t = 100)
+)
+
+fig.show()
+
+```
+
+# ANÁLISIS DE CLIENTES {background-color="#3a7ca5"}
+
+## Grados de repetición de clientes
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+**Participación por tipo**
+
+```{python}
+
+# Crear tabla con información requerida
+com_cli = (
+    df_pixel
+    .groupby("cliente_id")
+    .agg(
+        comandas = ("comanda_id","nunique")
+    )
+    .reset_index()
+)
+
+com_cli["tipo"] = com_cli["comandas"].apply(lambda x: "Repetidor" if x > 1 else "De una ocasion")
+
+cli_tipo = (
+    com_cli
+    .groupby("tipo")
+    .agg(
+        casos = ("cliente_id","nunique")
+    )
+    .reset_index()
+)
+
+total_clientes = cli_tipo["casos"].sum()
+
+def fun_info (x):
+    grp = x["tipo"]
+    n = x["casos"]
+    prc = n/total_clientes
+    texto = f"<b>{grp}</b><br>Casos: {n:,.0f}<br>Part.: {prc:.1%}"
+    return texto
+cli_tipo["info"] = cli_tipo.apply(fun_info, axis = 1)
+
+# Generar visualización interactiva
+fig = go.Figure(
+    data = go.Pie(
+        
+        values = cli_tipo["casos"],
+        labels = cli_tipo["tipo"],
+        
+        hovertext = cli_tipo["info"],
+        hoverinfo = "text",
+        hoverlabel = form_etiquetas,
+        
+        marker = dict(colors = [color_fill[1], color_fill[5]])
+
+    )
+)
+
+fig.update_layout(
+    showlegend = False,
+    width = 400
+)
+
+fig.show()
+
+```
+
+:::
+
+::: {.column width="50%"}
+
+**Participación por frecuencia**
+
+```{python}
+
+# Crear tabla simple con información requerida
+cli_repf = (
+    df_pixel.
+    groupby("cliente_id")
+    .agg(
+        comandas = ("comanda_id","nunique")
+    )
+    .reset_index()
+    .query("comandas > 1")
+)
+
+umbral = df_pixel["periodo"].max() - df_pixel["periodo"].min()
+def fun_tipo_frec (x):
+    if x > umbral:
+        return "a.Fiel"
+    elif umbral > x >= umbral/2:
+        return "b.Habitual"
+    else:
+        return "c.Esporadico"    
+cli_repf["tipo"] = cli_repf["comandas"].apply(fun_tipo_frec)
+
+cli_repf = cli_repf["tipo"].value_counts().sort_index().reset_index()
+
+def fun_info(x):
+    tip = x["tipo"]
+    n = x["count"]
+    return f"<b>{tip}</b><br>Casos: {n:,.0f}"
+cli_repf["info"] = cli_repf.apply(fun_info, axis = 1)
+
+# Generar visualizacion interactiva
+fig = go.Figure(
+    data = go.Bar(
+        
+        y = cli_repf["tipo"],
+        x = cli_repf["count"],
+        
+        hovertext = cli_repf["info"],
+        hoverinfo = "text",
+        hoverlabel = form_etiquetas,
+        
+        orientation = "h",
+        marker = dict(color = color_fill[6])
+    )
+)
+
+fig.update_layout(
+    plot_bgcolor=color_fondo,
+    xaxis = form_ticks,
+    yaxis = form_ticks,
+    width = 400
+)
+
+fig.show()
+
+```
+
+:::
+
+:::
+
+# ANÁLISIS DE PRECIOS {background-color="#3a7ca5"}
+
+## Distribución de precios de comida
+
+```{python}
+
+# Crear tabla con información requerida
+articulos = ["PLATOS FUERTES","ENTRADAS","POSTRES","MENU"]
+precio_comida = (
+    df_pixel
+    .query("tipo_articulo in @articulos")
+    .groupby(["comanda_id","tipo_articulo"])
+    .agg(
+        venta = ("valor_venta","sum"),
+        cantidad = ("valor_cantidad","sum")
+    )
+    .reset_index()
+)
+
+precio_comida["precio"] = precio_comida["venta"] / precio_comida["cantidad"]
+
+umbral = precio_comida["precio"].mean() + 2*precio_comida["precio"].std()
+precio_comida = precio_comida.query("precio <= @umbral")
+
+# Generar visualizacion interactiva
+fig = go.Figure(
+    data = go.Violin(
+        
+        x = precio_comida["tipo_articulo"],
+        y = precio_comida["precio"],
+        
+        hoveron = "kde",
+        hoverlabel = form_etiquetas,
+
+        opacity = 0.9,
+        points = False,
+        bandwidth = 1,
+        meanline = dict(
+            visible = True, 
+            color = color_fill[5]
+        ),
+        marker = dict(color = color_fill[1])
+    )
+)
+
+fig.update_layout(
+    plot_bgcolor = color_fondo,
+    xaxis = form_ticks,
+    yaxis = form_ticks,
+    autosize = False,
+    width = 1000,
+    height = 600
+)
+
+fig.show()
+
+```
+
+## Distribución de precios de bebidas
+```{python}
+
+# Crear tabla con información requerida
+articulos = ["BEBIDAS CALIENTES", "BEBIDAS FRIAS", "BEBIDAS ALCOHOLICAS"]
+precio_bebida = (
+    df_pixel
+    .query("tipo_articulo in @articulos")
+    .groupby(["comanda_id","tipo_articulo"])
+    .agg(
+        venta = ("valor_venta","sum"),
+        cantidad = ("valor_cantidad","sum")
+    )
+    .reset_index()
+)
+
+precio_bebida["precio"] = precio_bebida["venta"] / precio_bebida["cantidad"]
+
+umbral = precio_bebida["precio"].mean() + 2*precio_bebida["precio"].std()
+precio_bebida = precio_bebida.query("precio <= @umbral")
+
+# Generar visualizacion interactiva
+fig = go.Figure(
+    data = go.Violin(
+        
+        x = precio_bebida["tipo_articulo"],
+        y = precio_bebida["precio"],
+        
+        hoveron = "kde",
+        hoverlabel = form_etiquetas,
+
+        opacity = 0.9,
+        points = False,
+        bandwidth = 1,
+        meanline = dict(
+            visible = True, 
+            color = color_fill[5]
+        ),
+        marker = dict(color = color_fill[1])
+    )
+)
+
+fig.update_layout(
+    plot_bgcolor = color_fondo,
+    xaxis = form_ticks,
+    yaxis = form_ticks,
+    autosize = False,
+    width = 1000,
+    height = 600
+)
+
+fig.show()
+
+```
+
+# {background-color="#16425b"}

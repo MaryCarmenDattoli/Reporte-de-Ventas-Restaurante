@@ -1,0 +1,42 @@
+# Quarto generated files
+reporte_ventas.html
+reporte_ventas_files/
+*.quarto_ipynb
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+*.ipynb_checkpoints
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Data files (opcional - si quieres incluir registro_pixel.txt, elimina esta línea)
+# registro_pixel.txt
+
+# Logs
+*.log
+
+# Otros archivos generados
+*.cache
+
