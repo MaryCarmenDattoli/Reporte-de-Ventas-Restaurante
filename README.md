@@ -36,8 +36,8 @@ La presentación interactiva está publicada y disponible en:
 
 1. Clona este repositorio:
 ```bash
-git clone [URL_DEL_REPOSITORIO]
-cd reporte-ventas
+git clone https://github.com/MaryCarmenDattoli/Reporte-de-Ventas-Restaurante.git
+cd Reporte-de-Ventas-Restaurante
 ```
 
 2. Instala las dependencias de Python:
